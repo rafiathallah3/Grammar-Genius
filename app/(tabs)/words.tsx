@@ -3,6 +3,7 @@ import { ThemedView } from '@/components/themed-view';
 import { AppColors } from '@/constants/theme';
 import { sampleWords, Word } from '@/data/vocabulary';
 import { searchWord, WordResult } from '@/services/dictionary';
+import { generateWordDetails } from '@/services/gemini';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
 import {
@@ -96,6 +97,34 @@ export default function WordsScreen() {
     }
   };
 
+  const handleAiSearch = async () => {
+    if (!searchQuery.trim()) return;
+
+    setSearching(true);
+    setSearchError(null);
+    setLastSearched(searchQuery.trim());
+    setApiResults([]); // Clear previous results
+
+    try {
+      const result = await generateWordDetails(searchQuery.trim());
+      const newWord: Word = {
+        id: `ai_${result.word}_${Date.now()}`,
+        word: result.word,
+        phonetic: '', // AI didn't return phonetic, keep empty or placeholder
+        partOfSpeech: result.partOfSpeech,
+        definition: result.definition,
+        example: result.example,
+        difficulty: result.difficulty,
+      };
+      setApiResults([newWord]);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to generate word details';
+      setSearchError(errorMessage);
+    } finally {
+      setSearching(false);
+    }
+  };
+
   const allWords = [...sampleWords, ...apiResults];
 
   const filteredWords = allWords.filter((word) => {
@@ -115,6 +144,7 @@ export default function WordsScreen() {
   };
 
   const isApiWord = (wordId: string) => wordId.startsWith('api_');
+  const isAiWord = (wordId: string) => wordId.startsWith('ai_');
 
   const searchContainerStyle = useAnimatedStyle(() => {
     return {
@@ -127,6 +157,72 @@ export default function WordsScreen() {
     const isSelected = selectedWord?.id === item.id;
     const difficultyColor = getDifficultyColor(item.difficulty);
     const fromApi = isApiWord(item.id);
+    const fromAi = isAiWord(item.id);
+
+    if (fromAi) {
+      return (
+        <Animated.View
+          entering={FadeInDown.delay(index * 50).springify()}
+          layout={Layout.springify()}
+          style={styles.wordCardWrapper}
+        >
+          <View style={[styles.aiCardContainer, { backgroundColor: AppColors.primary + '15' }]}>
+            <View style={styles.aiHeader}>
+              <Ionicons name="sparkles" size={18} color={AppColors.primary} />
+              <ThemedText style={[styles.aiHeaderText, { color: AppColors.primary }]}>AI Generated Definition</ThemedText>
+            </View>
+
+            <View style={[styles.aiContentBox, { backgroundColor: AppColors.background }]}>
+              <View style={styles.wordHeader}>
+                <View style={styles.wordTitleRow}>
+                  <ThemedText type="defaultSemiBold" style={[styles.wordText, { color: AppColors.text }]}>
+                    {item.word}
+                  </ThemedText>
+                </View>
+                {item.phonetic && (
+                  <Text style={[styles.phonetic, { color: AppColors.textSecondary }]}>
+                    {item.phonetic}
+                  </Text>
+                )}
+              </View>
+
+              <View style={styles.wordRight}>
+                <View
+                  style={[
+                    styles.difficultyBadge,
+                    { backgroundColor: difficultyColor + '15' },
+                  ]}
+                >
+                  <Text style={[styles.difficultyText, { color: difficultyColor }]}>
+                    {item.difficulty}
+                  </Text>
+                </View>
+                <Text style={[styles.partOfSpeech, { color: AppColors.textSecondary }]}>
+                  {item.partOfSpeech}
+                </Text>
+              </View>
+
+              <View style={styles.divider} />
+
+              <ThemedText style={[styles.definition, { color: AppColors.text }]}>
+                {item.definition}
+              </ThemedText>
+
+              {item.example && (
+                <View style={[styles.exampleContainer, { backgroundColor: AppColors.card }]}>
+                  <ThemedText type="defaultSemiBold" style={[styles.exampleLabel, { color: AppColors.textSecondary }]}>
+                    Example
+                  </ThemedText>
+                  <ThemedText style={[styles.example, { color: AppColors.text }]}>
+                    "{item.example}"
+                  </ThemedText>
+                </View>
+              )}
+            </View>
+          </View>
+        </Animated.View>
+      );
+    }
 
     return (
       <Animated.View
@@ -206,63 +302,98 @@ export default function WordsScreen() {
 
   return (
     <ThemedView style={[styles.container, { backgroundColor: AppColors.background }]}>
-      <View style={[styles.headerContainer, { paddingTop: insets.top, backgroundColor: AppColors.card }]}>
-        <View style={styles.headerContent}>
-          <ThemedText type="title" style={styles.pageTitle}>Vocabulary</ThemedText>
-          <ThemedText style={styles.pageSubtitle}>Expand your word power</ThemedText>
-        </View>
-
-        <Animated.View style={[styles.searchContainer, searchContainerStyle]}>
-          <Ionicons name="search" size={20} color={AppColors.textSecondary} style={styles.searchIcon} />
-          <TextInput
-            style={[styles.searchInput, { color: AppColors.text }]}
-            placeholder="Search words..."
-            placeholderTextColor={AppColors.textSecondary}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            onFocus={() => (searchFocused.value = 1)}
-            onBlur={() => (searchFocused.value = 0)}
-          />
-          {searching && <ActivityIndicator size="small" color={AppColors.primary} />}
-        </Animated.View>
-
-        <View style={styles.filterContainer}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
-            {(['all', 'beginner', 'intermediate', 'advanced'] as const).map((difficulty) => {
-              const isActive = difficultyFilter === difficulty;
-              const difficultyColor = difficulty === 'all' ? AppColors.primary : getDifficultyColor(difficulty);
-              return (
-                <TouchableOpacity
-                  key={difficulty}
-                  style={[
-                    styles.filterChip,
-                    isActive
-                      ? { backgroundColor: difficultyColor, borderColor: difficultyColor }
-                      : { backgroundColor: 'transparent', borderColor: AppColors.border },
-                  ]}
-                  onPress={() => setDifficultyFilter(difficulty)}
-                >
-                  <Text
-                    style={[
-                      styles.filterText,
-                      { color: isActive ? '#FFF' : AppColors.textSecondary, fontWeight: isActive ? '700' : '500' },
-                    ]}
-                  >
-                    {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
-      </View>
-
       <FlatList
         data={filteredWords}
         renderItem={renderWordItem}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[
+          styles.listContent,
+          { paddingTop: insets.top + 20 }
+        ]}
         showsVerticalScrollIndicator={false}
+        ListHeaderComponent={
+          <>
+            {/* Header Section */}
+            <Animated.View entering={FadeInDown.duration(600).springify()} style={styles.headerSection}>
+              <View style={[styles.headerIconContainer, { backgroundColor: AppColors.primary + '15' }]}>
+                <Ionicons name="book" size={32} color={AppColors.primary} />
+              </View>
+              <View style={styles.headerText}>
+                <ThemedText type="title" style={styles.title}>
+                  Vocabulary
+                </ThemedText>
+                <ThemedText style={styles.subtitle}>
+                  Expand your word power
+                </ThemedText>
+              </View>
+            </Animated.View>
+
+            <Animated.View style={[styles.searchContainer, searchContainerStyle]}>
+              <Ionicons name="search" size={20} color={AppColors.textSecondary} style={styles.searchIcon} />
+              <TextInput
+                style={[styles.searchInput, { color: AppColors.text }]}
+                placeholder="Search words..."
+                placeholderTextColor={AppColors.textSecondary}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                onFocus={() => (searchFocused.value = 1)}
+                onBlur={() => (searchFocused.value = 0)}
+              />
+              {searching && <ActivityIndicator size="small" color={AppColors.primary} />}
+            </Animated.View>
+
+            {/* AI Search Option */}
+            {searchQuery.trim().length > 0 && !searching && (
+              <Animated.View entering={FadeInDown.duration(300)} style={styles.aiSearchContainer}>
+                <TouchableOpacity
+                  style={[styles.aiSearchButton, { backgroundColor: AppColors.primary + '10' }]}
+                  onPress={handleAiSearch}
+                >
+                  <Ionicons name="sparkles" size={16} color={AppColors.primary} />
+                  <ThemedText style={{ color: AppColors.primary, fontSize: 13, fontWeight: '600' }}>
+                    Ask AI to define "{searchQuery}"
+                  </ThemedText>
+                </TouchableOpacity>
+              </Animated.View>
+            )}
+
+            <View style={styles.filterContainer}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
+                {(['all', 'beginner', 'intermediate', 'advanced'] as const).map((difficulty) => {
+                  const isActive = difficultyFilter === difficulty;
+                  const difficultyColor = difficulty === 'all' ? AppColors.primary : getDifficultyColor(difficulty);
+                  return (
+                    <TouchableOpacity
+                      key={difficulty}
+                      style={[
+                        styles.filterChip,
+                        isActive
+                          ? { backgroundColor: difficultyColor, borderColor: difficultyColor }
+                          : { backgroundColor: 'transparent', borderColor: AppColors.border },
+                      ]}
+                      onPress={() => setDifficultyFilter(difficulty)}
+                    >
+                      <Text
+                        style={[
+                          styles.filterText,
+                          { color: isActive ? '#FFF' : AppColors.textSecondary, fontWeight: isActive ? '700' : '500' },
+                        ]}
+                      >
+                        {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
+            {searchError && (
+              <View style={[styles.errorCard, { backgroundColor: AppColors.error + '10' }]}>
+                <Text style={{ color: AppColors.error }}>{searchError}</Text>
+              </View>
+            )}
+          </>
+        }
         ListEmptyComponent={
           !searching ? (
             <View style={styles.emptyState}>
@@ -270,13 +401,6 @@ export default function WordsScreen() {
               <ThemedText style={{ color: AppColors.textSecondary, marginTop: 16 }}>
                 {searchQuery ? 'No definitions found.' : 'No words to show.'}
               </ThemedText>
-            </View>
-          ) : null
-        }
-        ListHeaderComponent={
-          searchError ? (
-            <View style={[styles.errorCard, { backgroundColor: AppColors.error + '10' }]}>
-              <Text style={{ color: AppColors.error }}>{searchError}</Text>
             </View>
           ) : null
         }
@@ -289,37 +413,39 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  headerContainer: {
-    paddingBottom: 16,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 5,
-    zIndex: 100,
+  headerSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 24,
+    gap: 16,
   },
-  headerContent: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
+  headerIconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  pageTitle: {
+  headerText: {
+    flex: 1,
+  },
+  title: {
     fontSize: 28,
     fontWeight: '800',
+    lineHeight: 34,
   },
-  pageSubtitle: {
-    fontSize: 16,
+  subtitle: {
+    fontSize: 15,
     opacity: 0.6,
   },
   searchContainer: {
-    marginHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F0F2F5',
     borderRadius: 16,
     paddingHorizontal: 16,
     height: 50,
+    marginBottom: 16,
   },
   searchIcon: {
     marginRight: 10,
@@ -330,10 +456,9 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   filterContainer: {
-    marginTop: 16,
+    marginBottom: 20,
   },
   filterScroll: {
-    paddingHorizontal: 20,
     gap: 8,
   },
   filterChip: {
@@ -347,7 +472,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: 20,
-    paddingTop: 20,
+    paddingTop: 0,
     paddingBottom: 40,
   },
   wordCardWrapper: {
@@ -442,5 +567,43 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 16,
     alignItems: 'center',
+  },
+  aiSearchContainer: {
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  aiSearchButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  aiCardContainer: {
+    padding: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: AppColors.primary + '30',
+  },
+  aiHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  aiHeaderText: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  aiContentBox: {
+    padding: 16,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
   },
 });

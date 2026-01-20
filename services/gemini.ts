@@ -50,12 +50,14 @@ export async function correctGrammar(sentence: string): Promise<GrammarCorrectio
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash', safetySettings: [
-      { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-      { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-      { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-      { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-    ]});
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-3-flash-preview', safetySettings: [
+        { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+        { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+        { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+        { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+      ]
+    });
 
     const prompt = `You are an English grammar expert. Analyze the following sentence and provide corrections.
 
@@ -104,7 +106,7 @@ export async function analyzeSentence(sentence: string): Promise<SentenceAnalysi
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
 
     const prompt = `You are an English language expert. Analyze the following sentence and provide detailed information.
 
@@ -152,3 +154,55 @@ Choose an appropriate category that best describes the grammar pattern or topic.
   }
 }
 
+
+export interface WordDetails {
+  word: string;
+  definition: string;
+  example: string;
+  partOfSpeech: string;
+  difficulty: 'beginner' | 'intermediate' | 'advanced';
+}
+
+export async function generateWordDetails(word: string): Promise<WordDetails> {
+  const genAI = await getGenAI();
+  if (!genAI) {
+    throw new Error('Gemini API key is not configured. Please set your API key in Settings.');
+  }
+
+  try {
+    const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
+
+    const prompt = `You are an English dictionary for learners. Define the following word and provide an example sentence.
+
+Word: "${word}"
+
+Please provide a JSON response with the following structure:
+{
+  "word": "${word}",
+  "definition": "simple and understandable definition",
+  "example": "a clear example sentence using the word",
+  "partOfSpeech": "noun/verb/adjective/etc",
+  "difficulty": "beginner" or "intermediate" or "advanced"
+}
+
+Keep the definition simple and capable of being understood by an English learner.`;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (!['beginner', 'intermediate', 'advanced'].includes(parsed.difficulty)) {
+        parsed.difficulty = 'intermediate';
+      }
+      return parsed as WordDetails;
+    }
+
+    throw new Error('Failed to parse word details response.');
+  } catch (error) {
+    console.error('Error fetching word details:', error);
+    throw new Error('Failed to fetch word details. Please try again.');
+  }
+}

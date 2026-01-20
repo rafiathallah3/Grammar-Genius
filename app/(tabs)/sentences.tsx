@@ -243,51 +243,61 @@ export default function SentencesScreen() {
 
   return (
     <ThemedView style={[styles.container, { backgroundColor: AppColors.background }]}>
-      {/* Header Container */}
-      <View style={[styles.headerContainer, { paddingTop: insets.top, backgroundColor: AppColors.card }]}>
-        <View style={styles.headerContent}>
-          <ThemedText type="title" style={styles.pageTitle}>Sentences</ThemedText>
-          <ThemedText style={styles.pageSubtitle}>Analyze and master structure</ThemedText>
-        </View>
-
-        {/* Analyze Input Section */}
-        <View style={styles.analyzeSection}>
-          <Animated.View style={[styles.inputWrapper, { backgroundColor: AppColors.background }, inputStyle]}>
-            <TextInput
-              style={[styles.input, { color: AppColors.text }]}
-              placeholder="Type a sentence to analyze..."
-              placeholderTextColor={AppColors.textSecondary}
-              value={newSentenceInput}
-              onChangeText={setNewSentenceInput}
-              onFocus={() => (inputFocused.value = 1)}
-              onBlur={() => (inputFocused.value = 0)}
-            />
-            <TouchableOpacity
-              style={[
-                styles.analyzeButton,
-                { backgroundColor: newSentenceInput.trim() ? AppColors.primary : AppColors.textSecondary + '40' }
-              ]}
-              onPress={handleAnalyze}
-              disabled={!newSentenceInput.trim() || analyzing}
-            >
-              {analyzing ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Ionicons name="sparkles" size={20} color="#fff" />
-              )}
-            </TouchableOpacity>
-          </Animated.View>
-        </View>
-      </View>
-
       <FlatList
         data={filteredSentences}
         renderItem={renderSentenceItem}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[
+          styles.listContent,
+          { paddingTop: insets.top + 20 }
+        ]}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <>
+            {/* Header Section */}
+            <Animated.View entering={FadeInDown.duration(600).springify()} style={styles.headerSection}>
+              <View style={[styles.headerIconContainer, { backgroundColor: AppColors.primary + '15' }]}>
+                <Ionicons name="language" size={32} color={AppColors.primary} />
+              </View>
+              <View style={styles.headerText}>
+                <ThemedText type="title" style={styles.title}>
+                  Sentences
+                </ThemedText>
+                <ThemedText style={styles.subtitle}>
+                  Analyze and master structure
+                </ThemedText>
+              </View>
+            </Animated.View>
+
+            {/* Analyze Input Section */}
+            <View style={styles.analyzeSection}>
+              <Animated.View style={[styles.inputWrapper, { backgroundColor: AppColors.card }, inputStyle]}>
+                <TextInput
+                  style={[styles.input, { color: AppColors.text }]}
+                  placeholder="Type a sentence to analyze..."
+                  placeholderTextColor={AppColors.textSecondary}
+                  value={newSentenceInput}
+                  onChangeText={setNewSentenceInput}
+                  onFocus={() => (inputFocused.value = 1)}
+                  onBlur={() => (inputFocused.value = 0)}
+                />
+                <TouchableOpacity
+                  style={[
+                    styles.analyzeButton,
+                    { backgroundColor: newSentenceInput.trim() ? AppColors.primary : AppColors.textSecondary + '40' }
+                  ]}
+                  onPress={handleAnalyze}
+                  disabled={!newSentenceInput.trim() || analyzing}
+                >
+                  {analyzing ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Ionicons name="sparkles" size={20} color="#fff" />
+                  )}
+                </TouchableOpacity>
+              </Animated.View>
+            </View>
+
             {/* Analysis Result Modal-like View */}
             {showAnalysis && analysisResult && (
               <Animated.View entering={FadeInDown.springify()} style={[styles.analysisResultCard, { backgroundColor: AppColors.card }]}>
@@ -411,31 +421,33 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  headerContainer: {
-    paddingBottom: 20,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 5,
-    zIndex: 100,
+  headerSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 24,
+    gap: 16,
   },
-  headerContent: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
+  headerIconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  pageTitle: {
+  headerText: {
+    flex: 1,
+  },
+  title: {
     fontSize: 28,
     fontWeight: '800',
+    lineHeight: 34,
   },
-  pageSubtitle: {
-    fontSize: 16,
+  subtitle: {
+    fontSize: 15,
     opacity: 0.6,
   },
   analyzeSection: {
-    paddingHorizontal: 20,
+    marginBottom: 20,
   },
   inputWrapper: {
     flexDirection: 'row',

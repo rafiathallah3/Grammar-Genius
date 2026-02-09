@@ -206,3 +206,66 @@ Keep the definition simple and capable of being understood by an English learner
     throw new Error('Failed to fetch word details. Please try again.');
   }
 }
+
+export interface QuizQuestion {
+  word: string;
+  question: string;
+  options: string[];
+  correctAnswer: string;
+  definition: string;
+  example: string;
+}
+
+export async function generateQuiz(count: number, difficulty: string): Promise<QuizQuestion[]> {
+  const genAI = await getGenAI();
+  if (!genAI) {
+    throw new Error('Gemini API key is not configured. Please set your API key in Settings.');
+  }
+
+  try {
+    const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
+
+    const prompt = `You are an English teacher creating a vocabulary quiz. Create a multiple-choice quiz with ${count} questions for a student at the "${difficulty}" level.
+
+For each question:
+1. Select a word that is interesting and appropriate for this level.
+2. Create a question (e.g., "What is the definition of X?").
+3. Provide 4 distinct options. One must be the correct definition, others should be plausible distractors.
+4. Indicate which option is the correct answer.
+5. Provide the definition of the word.
+6. Provide an example sentence using the word.
+
+Please provide a JSON response with the following structure:
+{
+  "questions": [
+    {
+      "word": "the word being tested",
+      "question": "The question text",
+      "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
+      "correctAnswer": "The text of the correct option",
+      "definition": "The definition",
+      "example": "Example sentence"
+    }
+  ]
+}
+
+Ensure the JSON is valid.`;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (parsed.questions && Array.isArray(parsed.questions)) {
+        return parsed.questions as QuizQuestion[];
+      }
+    }
+
+    throw new Error('Failed to parse quiz response.');
+  } catch (error) {
+    console.error('Error generating quiz:', error);
+    throw new Error('Failed to generate quiz. Please try again.');
+  }
+}

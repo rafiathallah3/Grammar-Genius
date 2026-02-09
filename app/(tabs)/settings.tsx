@@ -1,7 +1,7 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { AppColors } from '@/constants/theme';
-import { deleteApiKey, loadApiKey, saveApiKey } from '@/utils/storage';
+import { deleteApiKey, loadApiKey, loadTranslationLanguage, saveApiKey, saveTranslationLanguage } from '@/utils/storage';
 import { Ionicons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
 import React, { useEffect, useState } from 'react';
@@ -29,13 +29,25 @@ export default function SettingsScreen() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isMasked, setIsMasked] = useState(true);
+  const [targetLanguage, setTargetLanguage] = useState('Indonesian');
 
   // Animation shared values
   const inputFocused = useSharedValue(0);
 
   useEffect(() => {
     loadStoredApiKey();
+    loadLanguage();
   }, []);
+
+  const loadLanguage = async () => {
+    const lang = await loadTranslationLanguage();
+    setTargetLanguage(lang);
+  };
+
+  const handleLanguageChange = async (lang: string) => {
+    setTargetLanguage(lang);
+    await saveTranslationLanguage(lang);
+  };
 
   const loadStoredApiKey = async () => {
     try {
@@ -221,6 +233,46 @@ export default function SettingsScreen() {
           </View>
         </Animated.View>
 
+        {/* Translation Language Section */}
+        <Animated.View
+          entering={FadeInDown.delay(150).duration(600).springify()}
+          style={[styles.card, { backgroundColor: AppColors.card }]}
+        >
+          <View style={styles.cardHeader}>
+            <View style={[styles.cardIcon, { backgroundColor: AppColors.textSecondary + '15' }]}>
+              <Ionicons name="language" size={20} color={AppColors.textSecondary} />
+            </View>
+            <ThemedText type="defaultSemiBold" style={styles.cardTitle}>Translation Language</ThemedText>
+          </View>
+
+          <ThemedText style={[styles.description, { color: AppColors.textSecondary }]}>
+            Choose the target language for sentence analysis and translations.
+          </ThemedText>
+
+          <View style={styles.languageContainer}>
+            {['Indonesian', 'English', 'Japanese', 'Korean', 'Mandarin', 'Burmese', 'Tetum'].map((lang) => (
+              <TouchableOpacity
+                key={lang}
+                style={[
+                  styles.languageChip,
+                  {
+                    backgroundColor: targetLanguage === lang ? AppColors.primary : 'transparent',
+                    borderColor: targetLanguage === lang ? AppColors.primary : AppColors.border,
+                  }
+                ]}
+                onPress={() => handleLanguageChange(lang)}
+              >
+                <Text style={[
+                  styles.languageText,
+                  { color: targetLanguage === lang ? '#fff' : AppColors.textSecondary, fontWeight: targetLanguage === lang ? '600' : '400' }
+                ]}>
+                  {lang}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </Animated.View>
+
         {/* About Section */}
         <Animated.View
           entering={FadeInDown.delay(200).duration(600).springify()}
@@ -390,5 +442,19 @@ const styles = StyleSheet.create({
   footer: {
     marginTop: 20,
     opacity: 0.5,
+  },
+  languageContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  languageChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  languageText: {
+    fontSize: 14,
   },
 });

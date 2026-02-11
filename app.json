@@ -39,13 +39,7 @@
           }
         }
       ],
-      "./plugins/withProcessText",
-      [
-        "expo-audio",
-        {
-          "microphonePermission": "Allow $(PRODUCT_NAME) to access your microphone."
-        }
-      ]
+      "./plugins/withProcessText"
     ],
     "experiments": {
       "typedRoutes": true,

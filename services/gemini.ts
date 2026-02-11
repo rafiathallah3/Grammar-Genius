@@ -39,7 +39,6 @@ export interface SentenceAnalysis {
     meaning: string;
     difficulty: 'beginner' | 'intermediate' | 'advanced';
     category: string;
-    explanation: string;
     translation?: string;
 }
 
@@ -117,7 +116,6 @@ Please provide a JSON response with the following structure:
   "meaning": "a clear and concise explanation of what the sentence means",
   "difficulty": "beginner" or "intermediate" or "advanced",
   "category": "the grammar category or topic (e.g., 'Present Tense', 'Conditionals', 'Relative Clauses', 'Questions', 'Passive Voice', etc.) [MUST BE ONE OF THE CATEGORY LISTED]",
-  "explanation": "detailed explanation of the grammar structure, vocabulary, and usage",
   "translation": "translation to ${targetLanguage} if helpful, otherwise omit this field"
 }
 
@@ -275,5 +273,70 @@ Ensure the JSON is valid.`;
     } catch (error) {
         console.error('Error generating quiz:', error);
         throw new Error('Failed to generate quiz. Please try again.');
+    }
+}
+
+export interface SentenceBreakdown {
+    original: string;
+    translation: string;
+    explanation: string;
+}
+
+export interface ImageAnalysisResult {
+    sentences: SentenceBreakdown[];
+}
+
+export async function analyzeImage(base64Image: string): Promise<ImageAnalysisResult> {
+    const genAI = await getGenAI();
+    if (!genAI) {
+        throw new Error('Gemini API key is not configured. Please set your API key in Settings.');
+    }
+
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+        const result = await model.generateContent([
+            {
+                inlineData: {
+                    data: base64Image,
+                    mimeType: "image/jpeg"
+                }
+            },
+            {
+                text: `
+                Act as an expert English teacher. Analyze the text in this image.
+                
+                Please provide a JSON response with the following structure:
+                {
+                  "sentences": [
+                    {
+                      "original": "The original sentence found in the text",
+                      "translation": "Translation of the sentence into Indonesian",
+                      "explanation": "A clear, simple explanation of the grammar and meaning of the sentence."
+                    }
+                  ]
+                }
+                
+                If the text contains multiple sentences, break them down individually.
+                If there is no text, return an empty array.
+                Ensure the JSON is valid.
+                ` }
+        ]);
+
+        const response = result.response;
+        const text = response.text();
+
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0]);
+            if (parsed.sentences && Array.isArray(parsed.sentences)) {
+                return parsed as ImageAnalysisResult;
+            }
+        }
+
+        return { sentences: [] };
+
+    } catch (error) {
+        console.error('Error analyzing image:', error);
+        throw new Error('Failed to analyze image. Please try again.');
     }
 }

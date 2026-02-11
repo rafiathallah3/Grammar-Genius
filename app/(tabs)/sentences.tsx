@@ -121,7 +121,7 @@ export default function SentencesScreen() {
                 translation: analysisResult.analysis.translation,
                 difficulty: analysisResult.analysis.difficulty,
                 category: analysisResult.analysis.category,
-                explanation: analysisResult.analysis.explanation,
+                explanation: analysisResult.analysis.meaning,
             };
 
             await saveSentence(newSentence);
